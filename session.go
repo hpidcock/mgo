@@ -2470,6 +2470,21 @@ func IsTxnAborted(err error) bool {
 	return false
 }
 
+// IsWriteRetryable returns true when the error is a retryable error code.
+// These codes are from the Mongo Go Driver.
+func IsWriteRetryable(err error) bool {
+	code := 0
+	switch e := err.(type) {
+	case *QueryError:
+		code = e.Code
+	}
+	switch code {
+	case 6, 7, 89, 91, 189, 262, 9001, 10107, 11600, 11602, 13435, 13436:
+		return true
+	}
+	return false
+}
+
 // Insert inserts one or more documents in the respective collection.  In
 // case the session is in safe mode (see the SetSafe method) and an error
 // happens while inserting the provided documents, the returned error will
@@ -4981,7 +4996,14 @@ func (s *Session) finishTransaction(command string) error {
 			{Name: "autocommit", Value: false},
 			{Name: "lsid", Value: bson.M{"id": sessionId}},
 		}
-		err = s.Run(cmd, nil)
+		// Mongo Go Driver retries commitTransaction and abortTransaction atleast once.
+		// https://github.com/mongodb/mongo-go-driver/blob/e00adfdc309ad83b7f5852e950555f516037ca81/mongo/session.go#L224
+		for i := 0; i < 2; i++ {
+			err = s.Run(cmd, nil)
+			if err == nil {
+				break
+			}
+		}
 	}
 	s.m.Lock()
 	if s.transaction == txn {

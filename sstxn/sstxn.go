@@ -157,7 +157,7 @@ func (r *Runner) runTxn(ops []txn.Op, id bson.ObjectId) error {
 	defer func() {
 		if !completed {
 			abortErr := r.db.Session.AbortTransaction()
-			if abortErr != nil {
+			if abortErr != nil && abortErr.Error() != "no transaction in progress" {
 				r.logger.Errorf("error while aborting: %v", abortErr)
 			}
 		}
