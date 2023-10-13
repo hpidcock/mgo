@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -557,10 +558,17 @@ func (inst *MgoInstance) Restart() {
 	}
 }
 
+var testingUsed atomic.Bool
+
 // MgoTestPackage should be called to register the tests for any package
 // that requires a MongoDB server. If certs is non-nil, a secure SSL connection
 // will be used from client to server.
 func MgoTestPackage(t *testing.T, certs *Certs) {
+	defer func() {
+		if !testingUsed.Load() {
+			t.Fatalf("MgoTestPackage is not needed")
+		}
+	}()
 	if err := MgoServer.Start(certs); err != nil {
 		t.Fatal(err)
 	}
@@ -586,6 +594,7 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
+	testingUsed.Store(true)
 	mgo.SetStats(true)
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true
