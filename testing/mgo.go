@@ -237,7 +237,15 @@ func (inst *MgoInstance) Start(certs *Certs) error {
 			return errors.Annotatef(err, "failed to make directory for confined juju-db snap")
 		}
 	} else {
-		dbdir, err = ioutil.TempDir("", "test-mgo")
+		// Create a common test directory for mounting memory tmpfs for just mgo testing.
+		base := path.Join(os.TempDir(), "test-mgo-common")
+		err := os.Mkdir(base, 0755)
+		if os.IsExist(err) {
+			// do nothing
+		} else if err != nil {
+			return err
+		}
+		dbdir, err = ioutil.TempDir(base, "test-mgo")
 		if err != nil {
 			return err
 		}
