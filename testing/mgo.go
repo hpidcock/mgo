@@ -572,14 +572,14 @@ var testingUsed atomic.Bool
 // that requires a MongoDB server. If certs is non-nil, a secure SSL connection
 // will be used from client to server.
 func MgoTestPackage(t *testing.T, certs *Certs) {
-	defer func() {
-		if !testingUsed.Load() {
-			t.Fatalf("MgoTestPackage is not needed")
-		}
-	}()
 	if err := MgoServer.Start(certs); err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		if !testingUsed.Load() && !t.Failed() {
+			t.Fatalf("MgoTestPackage is not needed")
+		}
+	}()
 	defer MgoServer.Destroy()
 	gc.TestingT(t)
 }
@@ -595,6 +595,7 @@ func (s *mgoLogger) Output(calldepth int, message string) error {
 }
 
 func (s *MgoSuite) SetUpSuite(c *gc.C) {
+	testingUsed.Store(true)
 	if s.DebugMgo {
 		mgo.SetLogger(&mgoLogger{loggo.GetLogger("mgo")})
 		mgo.SetDebug(true)
@@ -602,7 +603,6 @@ func (s *MgoSuite) SetUpSuite(c *gc.C) {
 	if MgoServer.addr == "" {
 		c.Fatalf("No Mongo Server Address, MgoSuite tests must be run with MgoTestPackage")
 	}
-	testingUsed.Store(true)
 	mgo.SetStats(true)
 	// Make tests that use password authentication faster.
 	utils.FastInsecureHash = true
